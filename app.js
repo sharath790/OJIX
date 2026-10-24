@@ -1422,30 +1422,6 @@ const SERVICES_CATALOG = [
     ]
   },
   {
-    id: 'consulting-and-delivery',
-    title: 'Consulting and Delivery',
-    kicker: 'CONSULTING & DELIVERY',
-    heading: 'Technical Strategy & Squad Delivery',
-    description: 'Navigate architectural complexity, rescue delayed initiatives, and scale engineering capacity with dedicated teams.',
-    bannerImg: 'assets/generated/hero-erp-dashboard.jpg',
-    badge: 'Strategy • Execution',
-    icon: 'users',
-    services: [
-      { title: 'IT Consulting', desc: 'Recommend technology solutions for business needs.', icon: 'compass', href: '/process' },
-      { title: 'Solution Architecture', desc: 'Define system components, integrations and technical structure.', icon: 'git-pull-request', href: '/process' },
-      { title: 'Technology Assessment', desc: 'Evaluate feasibility, risks, technology and cost.', icon: 'clipboard', href: '/process' },
-      { title: 'Project Management', desc: 'Coordinate scope, schedules, resources and delivery.', icon: 'calendar', href: '/process' },
-      { title: 'Project Rescue', desc: 'Recover delayed, broken or abandoned projects.', icon: 'life-buoy', href: '/contact' },
-      { title: 'Code Auditing', desc: 'Review code quality, security and maintainability.', icon: 'file-text', href: '/process' },
-      { title: 'Development Outsourcing', desc: 'Deliver agreed software development work.', icon: 'briefcase', href: '/process' },
-      { title: 'Staff Augmentation', desc: 'Supply technical specialists to client teams.', icon: 'user-plus', href: '/contact' },
-      { title: 'Dedicated Development Teams', desc: 'Provide teams for ongoing development.', icon: 'users', href: '/contact' },
-      { title: 'Technical Documentation', desc: 'Create architecture, API and operating documentation.', icon: 'book-open', href: '/process' },
-      { title: 'Knowledge Transfer', desc: 'Prepare client teams to operate and maintain software.', icon: 'share-2', href: '/process' },
-      { title: 'Technical Training', desc: 'Train developers and employees in relevant technologies.', icon: 'award', href: '/process' }
-    ]
-  },
-  {
     id: 'marketing-and-growth',
     title: 'Marketing and Growth',
     kicker: 'MARKETING & GROWTH',
@@ -1525,6 +1501,8 @@ function initServicesMegaMenu(container) {
             id="services-tab-${cat.id}"
             aria-controls="services-panel"
             aria-selected="${idx === activeIndex ? 'true' : 'false'}"
+            title="${cat.title}"
+            aria-label="${cat.title} (${cat.services.length} services)"
             data-cat-index="${idx}">
             <span class="services-cat-left">
               <span class="services-cat-icon" aria-hidden="true">${renderIcon(cat.icon)}</span>
@@ -1554,32 +1532,22 @@ function initServicesMegaMenu(container) {
           <h3 class="services-overview-title">${cat.heading}</h3>
           <p class="services-overview-desc">${cat.description}</p>
         </div>
-        <div class="services-banner-card">
-          <img src="${cat.bannerImg}" alt="${cat.heading} banner preview" class="services-banner-img" loading="lazy" />
-          <div class="services-banner-badge">
-            ${cat.badge}
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-              <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
-            </svg>
-          </div>
-        </div>
       </div>
 
-      <h4 class="services-list-heading">Our ${cat.title} Services</h4>
+      <div class="services-scroll-body">
+        <h4 class="services-list-heading">Our ${cat.title} Services</h4>
 
-      <div class="services-catalog-grid">
-        ${cat.services.map((svc) => `
-          <a href="${svc.href}" class="services-catalog-row">
-            <span class="services-row-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
-            <span class="services-row-body">
-              <span class="services-row-title">${svc.title}</span>
-              <span class="services-row-desc">${svc.desc}</span>
-            </span>
-            <svg class="services-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="m9 18 6-6-6-6"/>
-            </svg>
-          </a>
-        `).join('')}
+        <div class="services-catalog-grid">
+          ${cat.services.map((svc) => `
+            <div class="services-catalog-row" title="${svc.title}">
+              <span class="services-row-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
+              <span class="services-row-body">
+                <span class="services-row-title">${svc.title}</span>
+                <span class="services-row-desc">${svc.desc}</span>
+              </span>
+            </div>
+          `).join('')}
+        </div>
       </div>
 
       <div class="services-cta-banner">
@@ -1603,15 +1571,16 @@ function initServicesMegaMenu(container) {
       </div>
     `;
 
-    // Close menu on CTA or service links click
-    rightPanel.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
+    // Close menu when consultation CTA is clicked
+    const ctaBtn = rightPanel.querySelector('.services-cta-button');
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', () => {
         container.classList.remove('is-mega-open');
         if (topLink) topLink.setAttribute('aria-expanded', 'false');
         const hdr = document.querySelector('.eleks-header');
         if (hdr) hdr.classList.remove('has-mega-open');
       });
-    });
+    }
   };
 
   const selectCategory = (index) => {
@@ -1742,21 +1711,31 @@ megaContainers.forEach((container) => {
 
   // Common Dropdown Hover and Dismissal Interactions
   if (topLink) {
+    let leaveTimer = null;
+
     const openDropdown = () => {
+      if (leaveTimer) {
+        clearTimeout(leaveTimer);
+        leaveTimer = null;
+      }
       topLink.setAttribute('aria-expanded', 'true');
       container.classList.add('is-mega-open');
       if (eleksHeader) eleksHeader.classList.add('has-mega-open');
     };
 
     const closeDropdown = () => {
-      topLink.setAttribute('aria-expanded', 'false');
-      container.classList.remove('is-mega-open');
-      if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(() => {
+        topLink.setAttribute('aria-expanded', 'false');
+        container.classList.remove('is-mega-open');
+        if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+      }, 140);
     };
 
     topLink.addEventListener('mouseenter', openDropdown);
     container.addEventListener('mouseenter', openDropdown);
     container.addEventListener('mouseleave', closeDropdown);
+    topLink.addEventListener('focus', openDropdown);
   }
 });
 
