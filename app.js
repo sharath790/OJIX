@@ -692,6 +692,9 @@ if (!prefersReducedMotion && window.matchMedia('(hover: hover) and (pointer: fin
 }
 
 // 6. MOBILE NAVIGATION
+let openMobileServicesModal = () => {};
+let closeMobileServicesModal = () => {};
+
 const menuToggle = document.querySelector('.menu-toggle');
 const mainNav = document.getElementById('main-nav');
 if (menuToggle && mainNav) {
@@ -730,6 +733,14 @@ if (menuToggle && mainNav) {
 
     const container = parentLink.closest('.nav-item-has-mega');
     if (!container) return;
+
+    // Mobile-Only Service Category Carousel Trigger
+    if (container.getAttribute('data-mega') === 'capabilities') {
+      closeNavigation();
+      openMobileServicesModal();
+      return;
+    }
+
     const willOpen = !container.classList.contains('is-mega-open');
 
     mainNav.querySelectorAll('.nav-item-has-mega').forEach((otherContainer) => {
@@ -747,6 +758,17 @@ if (menuToggle && mainNav) {
       scrollToCurrentRouteSection();
     }
   }, true);
+
+  // Global mobile trigger for any Services link across the page
+  document.addEventListener('click', (event) => {
+    if (window.innerWidth > 1023) return;
+    const servicesTrigger = event.target.closest('a[href="/services"], a[href="#services"], [data-open-mobile-services]');
+    if (servicesTrigger && !servicesTrigger.closest('#ojix-mobile-services-modal')) {
+      event.preventDefault();
+      closeNavigation();
+      openMobileServicesModal();
+    }
+  });
 
   // Parent disclosure links must stay open long enough for their submenu handler
   // to run. Only destination links close the mobile navigation.
@@ -1183,72 +1205,883 @@ if (saveCookiePrefsBtn) {
 }
 
 // ============================================================================
-// 13. ELEKS-STYLE HEADER MEGA-MENU SUBTABS INTERACTION
+// 13. ELEKS-STYLE HEADER MEGA-MENU & CENTRALIZED SERVICES CATALOG
 // ============================================================================
+
+// Centralized SVG Outline Icons System
+const SERVICE_ICONS = {
+  'code': '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  'smartphone': '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+  'server': '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+  'palette': '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/>',
+  'layout': '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+  'accessibility': '<circle cx="12" cy="4" r="2"/><path d="M4 9h16"/><path d="M12 9v12"/><path d="m8 21 4-6 4 6"/>',
+  'shopping-bag': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  'credit-card': '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  'shopping-cart': '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  'cpu': '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
+  'layers': '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  'users': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
+  'check-square': '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  'git-merge': '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  'receipt': '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h4"/>',
+  'archive': '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
+  'file-text': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+  'calendar': '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  'bar-chart-2': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  'brain': '<path d="M12 2a4 4 0 0 0-4 4v1H7a4 4 0 0 0-4 4 4 4 0 0 0 2 3.46V15a4 4 0 0 0 4 4h1v1a4 4 0 0 0 8 0v-1h1a4 4 0 0 0 4-4v-.54A4 4 0 0 0 21 11a4 4 0 0 0-4-4h-1V6a4 4 0 0 0-4-4z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M9 15h6"/>',
+  'bot': '<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>',
+  'search': '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  'git-branch': '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  'trending-up': '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+  'database': '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+  'activity': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  'hard-drive': '<line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/>',
+  'pie-chart': '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+  'check-circle': '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  'workflow': '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
+  'link': '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  'webhook': '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c0-2.21 1.79-4 4-4h.75a4 4 0 0 1 3.25-1.68V8a4 4 0 1 1 8 0v2"/>',
+  'refresh-cw': '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  'grid': '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  'corner-down-right': '<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+  'sliders': '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  'cloud': '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  'upload-cloud': '<polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>',
+  'terminal': '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+  'play': '<polygon points="5 3 19 12 5 21 5 3"/>',
+  'box': '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  'wifi': '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+  'dollar-sign': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  'shield': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  'shield-check': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>',
+  'repeat': '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  'navigation': '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+  'zap': '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  'key': '<path d="m21 2-2 2m-1.5 1.5L14 9a5 5 0 1 0 3 3l5-5-2-2-2.5 2.5"/>',
+  'lock': '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  'eye': '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  'wrench': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  'tool': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  'headphones': '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
+  'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  'monitor': '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  'settings': '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  'arrow-up-circle': '<circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/>',
+  'compass': '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  'git-pull-request': '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>',
+  'clipboard': '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
+  'life-buoy': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>',
+  'briefcase': '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>',
+  'book-open': '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  'share-2': '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+  'award': '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  'send': '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  'bar-chart': '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+  'target': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'feather': '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>',
+  'mail': '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  'factory': '<path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/>',
+  'book': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  'truck': '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  'home': '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  'hammer': '<path d="m15 12-8.5 8.5a2.12 2.12 0 0 1-3-3L12 9"/><path d="M17.64 4.36 20 2l2 2-2.36 2.36"/><path d="m15 7 2 2"/>',
+  'tag': '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  'clock': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'message-square': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+};
+
+const renderIcon = (name, className = '') => {
+  const path = SERVICE_ICONS[name] || SERVICE_ICONS['code'];
+  return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+};
+
+// Centralized Services Catalog (11 Categories, 93 Services)
+const SERVICES_CATALOG = [
+  {
+    id: 'software-development',
+    title: 'Software Development',
+    kicker: 'SOFTWARE DEVELOPMENT',
+    heading: 'Build Digital Solutions',
+    description: 'We create custom software, web and mobile applications, and backend systems that help your business grow, operate efficiently and serve your customers better.',
+    bannerImg: 'assets/generated/ui-company-system.jpg',
+    badge: 'Build • Scale • Grow',
+    icon: 'code',
+    services: [
+      { title: 'Custom Software & Enterprise Applications', desc: 'Tailored applications for unique business requirements.', icon: 'code', href: '/services' },
+      { title: 'Website & Mobile App Development', desc: 'Responsive websites and mobile applications.', icon: 'smartphone', href: '/services' },
+      { title: 'Backend, API & Microservices Development', desc: 'Scalable backend systems and APIs.', icon: 'server', href: '/services' },
+      { title: 'UI/UX Design & Prototyping', desc: 'User-focused interface design and interactive prototypes.', icon: 'palette', href: '/services' },
+      { title: 'Website, Mobile App & Branding Design', desc: 'Consistent digital experiences and visual identity.', icon: 'layout', href: '/services' },
+      { title: 'Usability & Accessibility Optimization', desc: 'More accessible and easier-to-use interfaces.', icon: 'accessibility', href: '/services' },
+      { title: 'E-commerce Website & Marketplace Development', desc: 'Online stores and multi-vendor marketplaces.', icon: 'shopping-bag', href: '/services' },
+      { title: 'Payment & Subscription Integration', desc: 'Payment gateways, recurring billing and subscriptions.', icon: 'credit-card', href: '/services' },
+      { title: 'Online Store Maintenance & Optimization', desc: 'Improve store reliability, speed and usability.', icon: 'shopping-cart', href: '/services' },
+      { title: 'Product Development', desc: 'Take software products from concept to release.', icon: 'cpu', href: '/services' }
+    ]
+  },
+  {
+    id: 'business-applications',
+    title: 'Business Applications',
+    kicker: 'BUSINESS APPLICATIONS',
+    heading: 'Enterprise Operations & ERP',
+    description: 'Connect finance, purchasing, inventory, staff records, and daily business operations in one unified workspace.',
+    bannerImg: 'assets/generated/ui-purchase-system.jpg',
+    badge: 'Automate • Streamline',
+    icon: 'grid',
+    services: [
+      { title: 'ERP Solutions', desc: 'Connect finance, purchasing, inventory and business operations.', icon: 'layers', href: '/procureos' },
+      { title: 'CRM Solutions', desc: 'Manage customer records, sales pipelines and relationships.', icon: 'users', href: '/companyos' },
+      { title: 'HR Management Systems', desc: 'Manage employees, recruitment, attendance and leave.', icon: 'user-check', href: '/companyos' },
+      { title: 'Project & Task Management', desc: 'Coordinate projects, responsibilities and deadlines.', icon: 'check-square', href: '/companyos' },
+      { title: 'Workflow Automation', desc: 'Automate approvals, reminders and repetitive processes.', icon: 'git-merge', href: '/services' },
+      { title: 'Billing & Invoicing Systems', desc: 'Manage invoices, payments and financial records.', icon: 'receipt', href: '/procureos' },
+      { title: 'Inventory Management', desc: 'Track stock, warehouses and inventory movements.', icon: 'archive', href: '/procureos' },
+      { title: 'Document Management', desc: 'Organize business documents, versions and permissions.', icon: 'file-text', href: '/dpdp-compliance' },
+      { title: 'Booking & Reservation Systems', desc: 'Manage appointments, availability and reservations.', icon: 'calendar', href: '/travelos' },
+      { title: 'Business Reporting Systems', desc: 'Present business performance and operational reports.', icon: 'bar-chart-2', href: '/companyos' }
+    ]
+  },
+  {
+    id: 'ai-and-data',
+    title: 'AI and Data',
+    kicker: 'AI & DATA ENGINEERING',
+    heading: 'Intelligent Systems & Analytics',
+    description: 'Transform raw organizational data into automated workflows, intelligent assistants, and predictive foresight.',
+    bannerImg: 'assets/generated/hero-campus-ai.jpg',
+    badge: 'Predict • Automate',
+    icon: 'brain',
+    services: [
+      { title: 'AI Integration', desc: 'Add AI capabilities to existing software.', icon: 'cpu', href: '/services' },
+      { title: 'AI Assistants & Chatbots', desc: 'Build assistants for customer and employee support.', icon: 'bot', href: '/services' },
+      { title: 'Enterprise Knowledge Systems', desc: 'Search company documents and internal knowledge.', icon: 'search', href: '/services' },
+      { title: 'Machine Learning Development', desc: 'Build models for classification and prediction.', icon: 'git-branch', href: '/services' },
+      { title: 'Predictive Analytics', desc: 'Identify trends and estimate future outcomes.', icon: 'trending-up', href: '/services' },
+      { title: 'Database Engineering', desc: 'Design, migrate and optimize databases.', icon: 'database', href: '/services' },
+      { title: 'Data Engineering & Pipelines', desc: 'Collect, transform and process business data.', icon: 'activity', href: '/services' },
+      { title: 'Data Warehousing', desc: 'Consolidate data for reporting and analysis.', icon: 'hard-drive', href: '/services' },
+      { title: 'Business Analytics', desc: 'Analyze sales, finance and operational performance.', icon: 'pie-chart', href: '/services' },
+      { title: 'Data Reconciliation', desc: 'Detect inconsistencies between systems and records.', icon: 'check-circle', href: '/services' }
+    ]
+  },
+  {
+    id: 'integration-and-modernization',
+    title: 'Integration and Modernization',
+    kicker: 'INTEGRATION & MODERNIZATION',
+    heading: 'Connected Tools & Upgrades',
+    description: 'Unify disparate tools and migrate legacy applications to modern, decoupled microservice systems.',
+    bannerImg: 'assets/generated/ui-travel-system.jpg',
+    badge: 'Connect • Modernize',
+    icon: 'workflow',
+    services: [
+      { title: 'System Integration', desc: 'Connect business applications and enterprise systems.', icon: 'link', href: '/services' },
+      { title: 'API & Webhook Integration', desc: 'Exchange data and trigger cross-system workflows.', icon: 'webhook', href: '/services' },
+      { title: 'Legacy Software Modernization', desc: 'Upgrade outdated applications and technology.', icon: 'refresh-cw', href: '/services' },
+      { title: 'Microservices Migration', desc: 'Restructure suitable systems into independently deployable services.', icon: 'grid', href: '/services' },
+      { title: 'Data Migration', desc: 'Transfer data safely between platforms.', icon: 'corner-down-right', href: '/services' },
+      { title: 'Platform Customization', desc: 'Adapt existing platforms to business requirements.', icon: 'sliders', href: '/services' }
+    ]
+  },
+  {
+    id: 'cloud-and-infrastructure',
+    title: 'Cloud and Infrastructure',
+    kicker: 'CLOUD & INFRASTRUCTURE',
+    heading: 'High-Availability Cloud Systems',
+    description: 'Provision and operate resilient Indian and global cloud environments with automated DevOps deployment pipelines.',
+    bannerImg: 'assets/generated/ui-privacy-vault.jpg',
+    badge: 'Scale • 99.99% Uptime',
+    icon: 'cloud',
+    services: [
+      { title: 'Cloud Infrastructure Management', desc: 'Provision and manage cloud resources.', icon: 'cloud', href: '/services' },
+      { title: 'Cloud Hosting & Deployment', desc: 'Host applications and manage releases.', icon: 'upload-cloud', href: '/services' },
+      { title: 'DevOps Engineering', desc: 'Improve software delivery and operations.', icon: 'terminal', href: '/services' },
+      { title: 'CI/CD Automation', desc: 'Automate builds, tests and deployments.', icon: 'play', href: '/services' },
+      { title: 'Containerization & Orchestration', desc: 'Package and manage containerized applications.', icon: 'box', href: '/services' },
+      { title: 'Network Management', desc: 'Configure and maintain network connectivity.', icon: 'wifi', href: '/services' },
+      { title: 'IT Infrastructure Management', desc: 'Manage servers, devices and core IT systems.', icon: 'server', href: '/services' },
+      { title: 'Cloud Cost Optimization', desc: 'Reduce waste and improve resource utilization.', icon: 'dollar-sign', href: '/services' }
+    ]
+  },
+  {
+    id: 'quality-and-security',
+    title: 'Quality and Security',
+    kicker: 'QUALITY & SECURITY',
+    heading: 'Rigorous QA & Security Compliance',
+    description: 'Ensure software reliability, verify complex user journeys, and protect enterprise data under statutory DPDP Act standards.',
+    bannerImg: 'assets/generated/hero-legal-chamber.jpg',
+    badge: 'DPDP 2023 • ISO 27001',
+    icon: 'shield-check',
+    services: [
+      { title: 'Functional & Integration Testing', desc: 'Verify features and system interactions.', icon: 'check-square', href: '/security' },
+      { title: 'Test Automation', desc: 'Automate repeatable software tests.', icon: 'repeat', href: '/security' },
+      { title: 'API & End-to-End Testing', desc: 'Validate APIs and complete user journeys.', icon: 'navigation', href: '/security' },
+      { title: 'Performance Testing', desc: 'Evaluate speed, concurrency and system capacity.', icon: 'zap', href: '/security' },
+      { title: 'Security Auditing', desc: 'Identify security weaknesses and configuration problems.', icon: 'shield', href: '/dpdp-compliance' },
+      { title: 'Penetration Testing', desc: 'Perform authorized testing for exploitable vulnerabilities.', icon: 'key', href: '/security' },
+      { title: 'Application Security', desc: 'Strengthen authentication, authorization and data protection.', icon: 'lock', href: '/security' },
+      { title: 'Security Monitoring', desc: 'Detect suspicious activity and investigate alerts.', icon: 'eye', href: '/security' }
+    ]
+  },
+  {
+    id: 'maintenance-and-support',
+    title: 'Maintenance and Support',
+    kicker: 'MAINTENANCE & SUPPORT',
+    heading: 'Reliable Support & System Health',
+    description: 'Keep applications dependable and secure with continuous monitoring, defect triage, and regular dependency updates.',
+    bannerImg: 'assets/generated/hero-overview-office.jpg',
+    badge: '24/7 • Active SLA',
+    icon: 'settings',
+    services: [
+      { title: 'Software Maintenance', desc: 'Keep applications stable and up to date.', icon: 'wrench', href: '/services' },
+      { title: 'Bug Fixing & Enhancements', desc: 'Resolve defects and add improvements.', icon: 'tool', href: '/services' },
+      { title: 'Technical Support', desc: 'Help users and teams solve technical problems.', icon: 'headphones', href: '/contact' },
+      { title: 'Incident Management', desc: 'Coordinate responses to production failures.', icon: 'alert-triangle', href: '/services' },
+      { title: 'Application Monitoring', desc: 'Track errors, performance and availability.', icon: 'monitor', href: '/services' },
+      { title: 'Managed Application Services', desc: 'Operate and maintain applications continuously.', icon: 'settings', href: '/services' },
+      { title: 'Version Upgrades', desc: 'Upgrade software frameworks, dependencies and platforms.', icon: 'arrow-up-circle', href: '/services' }
+    ]
+  },
+  {
+    id: 'marketing-and-growth',
+    title: 'Marketing and Growth',
+    kicker: 'MARKETING & GROWTH',
+    heading: 'Data-Driven Digital Growth',
+    description: 'Maximize acquisition, organic search visibility, and customer lifetime value with automated growth engines.',
+    bannerImg: 'assets/generated/ui-construction-system.jpg',
+    badge: 'Attract • Convert',
+    icon: 'trending-up',
+    services: [
+      { title: 'Digital Marketing', desc: 'Plan and manage digital marketing campaigns.', icon: 'send', href: '/contact' },
+      { title: 'Search Engine Optimization', desc: 'Improve organic search visibility.', icon: 'search', href: '/services' },
+      { title: 'Marketing Analytics', desc: 'Measure campaigns, leads and conversions.', icon: 'bar-chart', href: '/services' },
+      { title: 'Advertising Management', desc: 'Manage paid advertising campaigns.', icon: 'target', href: '/contact' },
+      { title: 'Content Marketing', desc: 'Develop content to attract and inform customers.', icon: 'feather', href: '/contact' },
+      { title: 'Email Automation', desc: 'Automate email campaigns and follow-ups.', icon: 'mail', href: '/services' },
+      { title: 'Conversion Optimization', desc: 'Improve digital experiences and conversion rates.', icon: 'trending-up', href: '/services' }
+    ]
+  },
+  {
+    id: 'industry-solutions',
+    title: 'Industry Solutions',
+    kicker: 'INDUSTRY SOLUTIONS',
+    heading: 'Specialized Industry Software',
+    description: 'Engineered platforms tailored to the statutory, operational, and billing requirements of your business sector.',
+    bannerImg: 'assets/generated/ui-campus-system.jpg',
+    badge: 'Industry-Grade Systems',
+    icon: 'factory',
+    services: [
+      { title: 'Healthcare Software', desc: 'Clinic, hospital, laboratory and patient applications.', icon: 'activity', href: '/contact' },
+      { title: 'Education Software', desc: 'School, college and learning management systems.', icon: 'book', href: '/campusos' },
+      { title: 'Retail Software', desc: 'Point-of-sale, inventory and retail operations.', icon: 'shopping-cart', href: '/procureos' },
+      { title: 'Logistics Software', desc: 'Shipment, delivery, fleet and warehouse management.', icon: 'truck', href: '/procureos' },
+      { title: 'Manufacturing Software', desc: 'Production planning and quality management.', icon: 'settings', href: '/procureos' },
+      { title: 'Financial Software', desc: 'Billing, reconciliation and financial operations.', icon: 'credit-card', href: '/procureos' },
+      { title: 'Real Estate Software', desc: 'Property listings, tenant and facility management.', icon: 'home', href: '/buildos' },
+      { title: 'Construction Software', desc: 'Project tracking, contractor coordination and cost management.', icon: 'hammer', href: '/buildos' },
+      { title: 'Insurance Software', desc: 'Policy, claims and customer management.', icon: 'shield', href: '/legalos' },
+      { title: 'Industrial IoT Solutions', desc: 'Device integration and equipment monitoring.', icon: 'cpu', href: '/services' }
+    ]
+  },
+  {
+    id: 'commercial-models',
+    title: 'Commercial Models',
+    kicker: 'COMMERCIAL MODELS',
+    heading: 'Transparent & Flexible Models',
+    description: 'Select the engagement structure that aligns with your delivery schedule, financial planning, and governance needs.',
+    bannerImg: 'assets/generated/ui-legal-system.jpg',
+    badge: 'Transparent • Zero Lock-In',
+    icon: 'file-text',
+    services: [
+      { title: 'Fixed-Price Projects', desc: 'Deliver an agreed scope for a defined price.', icon: 'tag', href: '/contact' },
+      { title: 'Time-Based Development', desc: 'Provide development services based on agreed effort.', icon: 'clock', href: '/contact' },
+      { title: 'Monthly Retainers', desc: 'Provide recurring support or development capacity.', icon: 'calendar', href: '/contact' },
+      { title: 'Managed Service Contracts', desc: 'Take responsibility for agreed systems and service levels.', icon: 'shield-check', href: '/contact' },
+      { title: 'Consulting Engagements', desc: 'Provide specialist advice and technical assessments.', icon: 'message-square', href: '/contact' }
+    ]
+  }
+];
+
+// Initialize Services Mega-Menu (11 Categories & Dynamic Content)
+function initServicesMegaMenu(container) {
+  const sidebar = container.querySelector('.eleks-mega-left');
+  const rightPanel = container.querySelector('.eleks-mega-right');
+  const topLink = container.querySelector('.nav-top-link');
+  if (!sidebar || !rightPanel) return;
+
+  let activeIndex = 0;
+
+  // Build the sidebar with all 11 categories
+  const renderSidebar = () => {
+    sidebar.innerHTML = `
+      <div class="services-sidebar-header">Our Services</div>
+      <div class="services-category-nav" role="none">
+        ${SERVICES_CATALOG.map((cat, idx) => `
+          <button type="button" class="services-category-btn ${idx === activeIndex ? 'is-active' : ''}"
+            role="tab"
+            id="services-tab-${cat.id}"
+            aria-controls="services-panel"
+            aria-selected="${idx === activeIndex ? 'true' : 'false'}"
+            title="${cat.title}"
+            aria-label="${cat.title} (${cat.services.length} services)"
+            data-cat-index="${idx}">
+            <span class="services-cat-left">
+              <span class="services-cat-icon" aria-hidden="true">${renderIcon(cat.icon)}</span>
+              <span class="services-cat-info">
+                <span class="services-cat-name">${cat.title}</span>
+                <span class="services-cat-count">${cat.services.length} Services</span>
+              </span>
+            </span>
+            <svg class="services-cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  // Build the right content panel for active category
+  const renderRightPanel = (index) => {
+    const cat = SERVICES_CATALOG[index];
+    if (!cat) return;
+
+    rightPanel.innerHTML = `
+      <div class="services-overview-header">
+        <div class="services-overview-text">
+          <span class="services-overview-kicker">${cat.kicker}</span>
+          <h3 class="services-overview-title">${cat.heading}</h3>
+          <p class="services-overview-desc">${cat.description}</p>
+        </div>
+      </div>
+
+      <div class="services-scroll-body">
+        <h4 class="services-list-heading">Our ${cat.title} Services</h4>
+
+        <div class="services-catalog-grid">
+          ${cat.services.map((svc) => `
+            <div class="services-catalog-row" title="${svc.title}">
+              <span class="services-row-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
+              <span class="services-row-body">
+                <span class="services-row-title">${svc.title}</span>
+                <span class="services-row-desc">${svc.desc}</span>
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="services-cta-banner">
+        <div class="services-cta-left">
+          <div class="services-cta-icon-box" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+              <path d="M9 18h6"/><path d="M10 22h4"/>
+            </svg>
+          </div>
+          <div class="services-cta-copy">
+            <span class="services-cta-eyebrow">LET'S BUILD SOMETHING GREAT</span>
+            <h5 class="services-cta-heading">Need a Custom Solution?</h5>
+            <p class="services-cta-desc">Tell us about your idea and our team will help you turn it into a powerful digital product.</p>
+          </div>
+        </div>
+        <a href="/contact" class="services-cta-button">
+          Get a Free Consultation
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    `;
+
+    // Close menu when consultation CTA is clicked
+    const ctaBtn = rightPanel.querySelector('.services-cta-button');
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', () => {
+        container.classList.remove('is-mega-open');
+        if (topLink) topLink.setAttribute('aria-expanded', 'false');
+        const hdr = document.querySelector('.eleks-header');
+        if (hdr) hdr.classList.remove('has-mega-open');
+      });
+    }
+  };
+
+  const selectCategory = (index) => {
+    if (index === activeIndex || index < 0 || index >= SERVICES_CATALOG.length) return;
+    activeIndex = index;
+    const buttons = sidebar.querySelectorAll('.services-category-btn');
+    buttons.forEach((btn, idx) => {
+      const active = idx === activeIndex;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-selected', String(active));
+    });
+    renderRightPanel(activeIndex);
+  };
+
+  // Initial renders
+  renderSidebar();
+  renderRightPanel(activeIndex);
+
+  // Event Delegation on sidebar
+  sidebar.addEventListener('pointerenter', (e) => {
+    const btn = e.target.closest('.services-category-btn');
+    if (btn) {
+      const idx = parseInt(btn.getAttribute('data-cat-index'), 10);
+      selectCategory(idx);
+    }
+  }, true);
+
+  sidebar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.services-category-btn');
+    if (btn) {
+      e.preventDefault();
+      const idx = parseInt(btn.getAttribute('data-cat-index'), 10);
+      selectCategory(idx);
+      btn.focus();
+    }
+  });
+
+  // Keyboard navigation within tablist
+  sidebar.addEventListener('keydown', (e) => {
+    const buttons = Array.from(sidebar.querySelectorAll('.services-category-btn'));
+    const currentBtn = document.activeElement;
+    const currentIndex = buttons.indexOf(currentBtn);
+    if (currentIndex === -1) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIdx = (currentIndex + 1) % buttons.length;
+      buttons[nextIdx].focus();
+      selectCategory(nextIdx);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIdx = (currentIndex - 1 + buttons.length) % buttons.length;
+      buttons[prevIdx].focus();
+      selectCategory(prevIdx);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      buttons[0].focus();
+      selectCategory(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      buttons[buttons.length - 1].focus();
+      selectCategory(buttons.length - 1);
+    }
+  });
+}
+
+// Master Mega-Menus Initialization
 const megaContainers = document.querySelectorAll('.nav-item-has-mega');
 const eleksHeader = document.querySelector('.eleks-header');
 
 megaContainers.forEach((container) => {
   const topLink = container.querySelector('.nav-top-link');
-  const subtabs = container.querySelectorAll('.eleks-subtab');
-  const rightPanel = container.querySelector('.eleks-mega-right');
-  const previewKicker = container.querySelector('.eleks-preview-kicker');
-  const previewTitle = container.querySelector('.eleks-preview-title');
-  const previewDesc = container.querySelector('.eleks-preview-desc');
-  const previewImg = container.querySelector('.eleks-preview-img');
+  const megaType = container.getAttribute('data-mega');
 
-  const activateSubtab = (subtab) => {
-    if (!subtab) return;
-    subtabs.forEach((tab) => {
-      const active = tab === subtab;
+  if (megaType === 'capabilities') {
+    // 11 Categories Services Mega-Menu
+    initServicesMegaMenu(container);
+  } else {
+    // Products Subtabs (Platforms)
+    const subtabs = container.querySelectorAll('.eleks-subtab');
+    const rightPanel = container.querySelector('.eleks-mega-right');
+    const previewKicker = container.querySelector('.eleks-preview-kicker');
+    const previewTitle = container.querySelector('.eleks-preview-title');
+    const previewDesc = container.querySelector('.eleks-preview-desc');
+    const previewImg = container.querySelector('.eleks-preview-img');
+
+    const activateSubtab = (subtab) => {
+      if (!subtab) return;
+      subtabs.forEach((tab) => {
+        const active = tab === subtab;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+
+      if (rightPanel && previewTitle && previewDesc) {
+        const newTitle = subtab.getAttribute('data-preview-title') || '';
+        const newDesc = subtab.getAttribute('data-preview-desc') || '';
+        const newBadge = subtab.getAttribute('data-preview-badge') || '';
+        const newImg = subtab.getAttribute('data-preview-img') || '';
+        const newHref = subtab.getAttribute('href') || '#';
+
+        if (previewTitle.textContent !== newTitle) {
+          rightPanel.classList.add('is-switching');
+          if (previewKicker && newBadge) previewKicker.textContent = newBadge;
+          previewTitle.textContent = newTitle;
+          previewDesc.textContent = newDesc;
+          if (previewImg && newImg) {
+            previewImg.src = newImg;
+            previewImg.alt = `${newTitle} preview`;
+          }
+          const rightLinks = rightPanel.querySelectorAll('a');
+          rightLinks.forEach((link) => link.setAttribute('href', newHref));
+          setTimeout(() => rightPanel.classList.remove('is-switching'), 160);
+        }
+      }
+    };
+
+    subtabs.forEach((subtab) => {
+      subtab.addEventListener('pointerenter', () => activateSubtab(subtab));
+      subtab.addEventListener('focus', () => activateSubtab(subtab));
+      subtab.addEventListener('click', () => {
+        container.classList.remove('is-mega-open');
+        if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+        if (topLink) topLink.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  // Common Dropdown Hover and Dismissal Interactions
+  if (topLink) {
+    let leaveTimer = null;
+
+    const openDropdown = () => {
+      if (leaveTimer) {
+        clearTimeout(leaveTimer);
+        leaveTimer = null;
+      }
+      topLink.setAttribute('aria-expanded', 'true');
+      container.classList.add('is-mega-open');
+      if (eleksHeader) eleksHeader.classList.add('has-mega-open');
+    };
+
+    const closeDropdown = () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(() => {
+        topLink.setAttribute('aria-expanded', 'false');
+        container.classList.remove('is-mega-open');
+        if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+      }, 140);
+    };
+
+    topLink.addEventListener('mouseenter', openDropdown);
+    container.addEventListener('mouseenter', openDropdown);
+    container.addEventListener('mouseleave', closeDropdown);
+    topLink.addEventListener('focus', openDropdown);
+  }
+});
+
+// Global outside-click and Escape listeners for Mega-Menus
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    megaContainers.forEach((container) => {
+      if (container.classList.contains('is-mega-open') || container.querySelector('.eleks-mega-dropdown:hover')) {
+        container.classList.remove('is-mega-open');
+        const topLink = container.querySelector('.nav-top-link');
+        if (topLink) {
+          topLink.setAttribute('aria-expanded', 'false');
+          topLink.focus();
+        }
+      }
+    });
+    if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+  }
+});
+
+// ============================================================================
+// 13B. OJIX MOBILE-ONLY SERVICE CATEGORY CAROUSEL MODAL
+// ============================================================================
+function initMobileServicesCarousel() {
+  let modal = document.getElementById('ojix-mobile-services-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'ojix-mobile-services-modal';
+    modal.className = 'ojix-mobile-services-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Services Catalog');
+    modal.setAttribute('hidden', '');
+    modal.innerHTML = `
+      <div class="mobile-services-backdrop" data-close-mobile-services></div>
+      <div class="mobile-services-sheet">
+        <header class="mobile-services-header">
+          <a href="#top" class="mobile-services-brand" aria-label="OJIX home">
+            <img src="assets/ojix-navbar-logo.svg" alt="OJIX" width="96" height="46" />
+          </a>
+          <button type="button" class="mobile-services-close-btn" data-close-mobile-services aria-label="Close services panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </header>
+        <div class="mobile-services-nav-bar">
+          <div class="mobile-services-nav-top">
+            <span class="mobile-services-eyebrow">OUR SERVICES</span>
+            <span class="mobile-services-counter" aria-live="polite">
+              <span class="mobile-counter-current">01</span><span class="mobile-counter-sep">/</span><span class="mobile-counter-total">10</span>
+            </span>
+          </div>
+          <div class="mobile-services-tabs-scroll" role="tablist" aria-label="Service Categories" tabindex="0"></div>
+        </div>
+        <div class="mobile-services-carousel-wrap">
+          <div class="mobile-services-carousel" id="mobile-services-carousel" tabindex="0" role="region" aria-label="Service category carousel"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const tabsContainer = modal.querySelector('.mobile-services-tabs-scroll');
+  const carousel = modal.querySelector('#mobile-services-carousel');
+  const counterCurrent = modal.querySelector('.mobile-counter-current');
+  const counterTotal = modal.querySelector('.mobile-counter-total');
+  const closeBtn = modal.querySelector('.mobile-services-close-btn');
+  if (!tabsContainer || !carousel) return;
+
+  const totalCategories = SERVICES_CATALOG.length;
+  if (counterTotal) {
+    counterTotal.textContent = String(totalCategories).padStart(2, '0');
+  }
+
+  const CATEGORY_SHORT_NAMES = {
+    'software-development': 'Software',
+    'business-applications': 'Business',
+    'ai-and-data': 'AI & Data',
+    'integration-and-modernization': 'Integrations',
+    'cloud-and-infrastructure': 'Cloud',
+    'quality-and-security': 'Security',
+    'maintenance-and-support': 'Support',
+    'marketing-and-growth': 'Marketing',
+    'industry-solutions': 'Industry Solutions',
+    'commercial-models': 'Commercial Models'
+  };
+
+  // 1. Render Category Tabs (Horizontally scrollable selector)
+  tabsContainer.innerHTML = SERVICES_CATALOG.map((cat, idx) => {
+    const shortName = CATEGORY_SHORT_NAMES[cat.id] || cat.title;
+    return `
+      <button type="button"
+        class="mobile-cat-tab ${idx === 0 ? 'is-active' : ''}"
+        role="tab"
+        id="mobile-cat-tab-${cat.id}"
+        aria-controls="mobile-cat-panel-${cat.id}"
+        aria-selected="${idx === 0 ? 'true' : 'false'}"
+        title="${cat.title} (${cat.services.length} services)"
+        data-cat-index="${idx}">
+        <span class="mobile-cat-tab-icon" aria-hidden="true">${renderIcon(cat.icon)}</span>
+        <span class="mobile-cat-tab-text">${shortName}</span>
+      </button>
+    `;
+  }).join('');
+
+  // 2. Render Carousel Slides (One prominent category card per slide)
+  carousel.innerHTML = SERVICES_CATALOG.map((cat, idx) => {
+    const rowCount = Math.ceil(cat.services.length / 2);
+    return `
+      <article class="mobile-carousel-slide"
+        role="tabpanel"
+        id="mobile-cat-panel-${cat.id}"
+        aria-labelledby="mobile-cat-tab-${cat.id}"
+        data-cat-index="${idx}">
+        <div class="mobile-cat-card">
+          <!-- Category Header: Title & Description -->
+          <div class="mobile-cat-header">
+            <h3 class="mobile-cat-title">${cat.title}</h3>
+            <p class="mobile-cat-desc">${cat.description}</p>
+          </div>
+
+          <!-- Category Banner Image -->
+          ${cat.bannerImg ? `
+            <div class="mobile-cat-banner-wrap">
+              <img src="${cat.bannerImg}" alt="${cat.title} banner" class="mobile-cat-banner-img" loading="lazy" />
+            </div>
+          ` : ''}
+
+          <!-- Section Heading: Services -->
+          <div class="mobile-cat-section-header">
+            <span class="mobile-cat-section-title">Services</span>
+            <span class="mobile-cat-section-count">${cat.services.length}</span>
+          </div>
+
+          <!-- Compact Service List (Two-Column Grid) -->
+          <div class="mobile-cat-services-grid" style="grid-template-rows: repeat(${rowCount}, auto);">
+            ${cat.services.map((svc) => `
+              <div class="mobile-cat-svc-item" title="${svc.title}">
+                <span class="mobile-cat-svc-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
+                <span class="mobile-cat-svc-name">${svc.title}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Compact Bottom Call-To-Action (CTA) -->
+          <div class="mobile-cat-cta">
+            <div class="mobile-cat-cta-header">
+              <div class="mobile-cat-cta-bulb" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                  <path d="M9 18h6"/><path d="M10 22h4"/>
+                </svg>
+              </div>
+              <div class="mobile-cat-cta-text">
+                <span class="mobile-cat-cta-eyebrow">LET'S BUILD SOMETHING GREAT</span>
+                <h4 class="mobile-cat-cta-title">Need a custom solution?</h4>
+              </div>
+            </div>
+            <a href="/contact" class="mobile-cat-cta-btn">
+              <span>Discuss a project</span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  let currentCategoryIndex = 0;
+  const tabButtons = tabsContainer.querySelectorAll('.mobile-cat-tab');
+
+  const updateActiveTab = (index) => {
+    if (index < 0 || index >= totalCategories) return;
+    currentCategoryIndex = index;
+
+    tabButtons.forEach((tab, i) => {
+      const active = i === index;
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', String(active));
+      if (active) {
+        tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
     });
 
-    if (rightPanel && previewTitle && previewDesc) {
-      const newTitle = subtab.getAttribute('data-preview-title') || '';
-      const newDesc = subtab.getAttribute('data-preview-desc') || '';
-      const newBadge = subtab.getAttribute('data-preview-badge') || '';
-      const newImg = subtab.getAttribute('data-preview-img') || '';
-      const newHref = subtab.getAttribute('href') || '#';
-
-      if (previewTitle.textContent !== newTitle) {
-        rightPanel.classList.add('is-switching');
-        if (previewKicker && newBadge) previewKicker.textContent = newBadge;
-        previewTitle.textContent = newTitle;
-        previewDesc.textContent = newDesc;
-        if (previewImg && newImg) {
-          previewImg.src = newImg;
-          previewImg.alt = `${newTitle} preview`;
-        }
-        const rightLinks = rightPanel.querySelectorAll('a');
-        rightLinks.forEach((link) => link.setAttribute('href', newHref));
-        setTimeout(() => rightPanel.classList.remove('is-switching'), 160);
-      }
+    if (counterCurrent) {
+      counterCurrent.textContent = String(index + 1).padStart(2, '0');
     }
   };
 
-  subtabs.forEach((subtab) => {
-    subtab.addEventListener('pointerenter', () => activateSubtab(subtab));
-    subtab.addEventListener('focus', () => activateSubtab(subtab));
-    subtab.addEventListener('click', () => {
-      container.classList.remove('is-mega-open');
-      if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
-      if (topLink) topLink.setAttribute('aria-expanded', 'false');
+  const goToSlide = (index, { smooth = true } = {}) => {
+    if (index < 0 || index >= totalCategories) return;
+    const slideWidth = carousel.clientWidth;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    carousel.scrollTo({
+      left: index * slideWidth,
+      behavior: (smooth && !reducedMotion) ? 'smooth' : 'auto'
     });
+    updateActiveTab(index);
+  };
+
+  // Category tab clicks
+  tabsContainer.addEventListener('click', (e) => {
+    const tab = e.target.closest('.mobile-cat-tab');
+    if (!tab) return;
+    e.preventDefault();
+    const idx = parseInt(tab.getAttribute('data-cat-index'), 10);
+    goToSlide(idx);
   });
 
-  if (topLink) {
-    topLink.addEventListener('mouseenter', () => {
-      topLink.setAttribute('aria-expanded', 'true');
+  // Carousel scroll sync with debouncing / rAF
+  let scrollRaf = null;
+  carousel.addEventListener('scroll', () => {
+    if (scrollRaf) cancelAnimationFrame(scrollRaf);
+    scrollRaf = requestAnimationFrame(() => {
+      const slideWidth = carousel.clientWidth;
+      if (!slideWidth) return;
+      const detected = Math.round(carousel.scrollLeft / slideWidth);
+      if (detected !== currentCategoryIndex && detected >= 0 && detected < totalCategories) {
+        updateActiveTab(detected);
+      }
     });
-    container.addEventListener('mouseleave', () => {
-      topLink.setAttribute('aria-expanded', 'false');
-      container.classList.remove('is-mega-open');
-      if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+  }, { passive: true });
+
+  // Mouse Drag Support (allows desktop/touch-emulator dragging)
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragScrollLeft = 0;
+
+  carousel.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragStartX = e.pageX;
+    dragScrollLeft = carousel.scrollLeft;
+    carousel.style.scrollBehavior = 'auto';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const walk = e.pageX - dragStartX;
+    carousel.scrollLeft = dragScrollLeft - walk;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    carousel.style.scrollBehavior = 'smooth';
+    const slideWidth = carousel.clientWidth;
+    const target = Math.round(carousel.scrollLeft / slideWidth);
+    goToSlide(target);
+  });
+
+  // Keyboard navigation when inside carousel or modal
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') {
+      if (currentCategoryIndex < totalCategories - 1) {
+        e.preventDefault();
+        goToSlide(currentCategoryIndex + 1);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      if (currentCategoryIndex > 0) {
+        e.preventDefault();
+        goToSlide(currentCategoryIndex - 1);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeMobileServicesModal();
+    }
+  });
+
+  // Open and Close implementations
+  let lastFocusedElement = null;
+
+  openMobileServicesModal = (targetIndex = 0) => {
+    lastFocusedElement = document.activeElement;
+    modal.removeAttribute('hidden');
+    modal.classList.add('is-open');
+    document.body.classList.add('mobile-services-modal-open');
+    document.documentElement.classList.add('mobile-services-modal-open');
+
+    // Go to requested category index or default to 0
+    requestAnimationFrame(() => {
+      goToSlide(targetIndex, { smooth: false });
+      if (closeBtn) closeBtn.focus();
     });
-  }
-});
+  };
+
+  closeMobileServicesModal = () => {
+    if (!modal.classList.contains('is-open')) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('hidden', '');
+    document.body.classList.remove('mobile-services-modal-open');
+    document.documentElement.classList.remove('mobile-services-modal-open');
+
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      lastFocusedElement.focus();
+    }
+  };
+
+  // Close triggers
+  modal.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close-mobile-services]')) {
+      e.preventDefault();
+      closeMobileServicesModal();
+      return;
+    }
+    // Clicking any service link or CTA or brand closes the panel
+    const navLink = e.target.closest('a');
+    if (navLink) {
+      closeMobileServicesModal();
+    }
+  });
+
+  // Auto-close if screen resized above 1023px
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 1023 && modal.classList.contains('is-open')) {
+      closeMobileServicesModal();
+    }
+  }, { passive: true });
+}
+
+// Initialize Mobile Services Carousel
+initMobileServicesCarousel();
 
 // ============================================================================
 // 14. ELEKS-STYLE HERO HORIZONTAL EXPANDING ACCORDION SUBTABS
