@@ -855,7 +855,7 @@ html.mobile-services-modal-open {
 
   .mobile-cat-card {
     background: #FFFFFF;
-    border-radius: 14px;
+    border-radius: 0px !important;
     padding: 16px 14px;
     border: 1px solid #EAEFF5;
     box-shadow: 0 2px 12px rgba(15, 28, 46, 0.05);
@@ -880,7 +880,7 @@ html.mobile-services-modal-open {
   .mobile-cat-banner-wrap {
     width: 100%;
     height: 125px;
-    border-radius: 10px;
+    border-radius: 0px !important;
     overflow: hidden;
     margin: 12px 0 14px;
     background: #F1F4F8;
@@ -937,37 +937,34 @@ html.mobile-services-modal-open {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 8px;
+    padding: 8px 10px;
     background: #FAFCFE;
     border: 1px solid #EAEFF5;
-    border-radius: 8px;
-    text-decoration: none;
+    border-radius: 0px !important;
     color: #0F1C2E;
     min-height: 44px;
     box-sizing: border-box;
-    transition: background-color 150ms ease, border-color 150ms ease;
+    cursor: default;
+    user-select: none;
   }
 
-  .mobile-cat-svc-item:active {
-    background: #FFF8F2;
-    border-color: rgba(201, 102, 47, 0.4);
-  }
-
+  /* Dark service icons with no background/badge */
   .mobile-cat-svc-icon {
     flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    background: #EDF2F7;
-    color: #C9662F;
+    width: 20px;
+    height: 20px;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--navy, #0F1C2E) !important;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .mobile-cat-svc-icon svg {
-    width: 13px;
-    height: 13px;
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
   }
 
   .mobile-cat-svc-name {
@@ -991,17 +988,9 @@ html.mobile-services-modal-open {
     color: #A0AEC0;
   }
 
-  /* Compact Bottom Call-To-Action (CTA) */
+  /* 1. Hide promotional CTA section on mobile Services */
   .mobile-cat-cta {
-    margin-top: 14px;
-    padding: 12px 14px;
-    background: linear-gradient(135deg, #0F1C2E 0%, #172B45 100%);
-    border-radius: 10px;
-    color: #FFFFFF;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    box-shadow: 0 4px 14px rgba(15, 28, 46, 0.12);
+    display: none !important;
   }
 
   .mobile-cat-cta-header {

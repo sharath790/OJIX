@@ -1897,13 +1897,10 @@ function initMobileServicesCarousel() {
           <!-- Compact Service List (Two-Column Grid) -->
           <div class="mobile-cat-services-grid" style="grid-template-rows: repeat(${rowCount}, auto);">
             ${cat.services.map((svc) => `
-              <a href="${svc.href}" class="mobile-cat-svc-item" aria-label="${svc.title}" title="${svc.title}">
+              <div class="mobile-cat-svc-item" title="${svc.title}">
                 <span class="mobile-cat-svc-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
                 <span class="mobile-cat-svc-name">${svc.title}</span>
-                <svg class="mobile-cat-svc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
-              </a>
+              </div>
             `).join('')}
           </div>
 
