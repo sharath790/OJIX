@@ -692,6 +692,9 @@ if (!prefersReducedMotion && window.matchMedia('(hover: hover) and (pointer: fin
 }
 
 // 6. MOBILE NAVIGATION
+let openMobileServicesModal = () => {};
+let closeMobileServicesModal = () => {};
+
 const menuToggle = document.querySelector('.menu-toggle');
 const mainNav = document.getElementById('main-nav');
 if (menuToggle && mainNav) {
@@ -730,6 +733,14 @@ if (menuToggle && mainNav) {
 
     const container = parentLink.closest('.nav-item-has-mega');
     if (!container) return;
+
+    // Mobile-Only Service Category Carousel Trigger
+    if (container.getAttribute('data-mega') === 'capabilities') {
+      closeNavigation();
+      openMobileServicesModal();
+      return;
+    }
+
     const willOpen = !container.classList.contains('is-mega-open');
 
     mainNav.querySelectorAll('.nav-item-has-mega').forEach((otherContainer) => {
@@ -747,6 +758,17 @@ if (menuToggle && mainNav) {
       scrollToCurrentRouteSection();
     }
   }, true);
+
+  // Global mobile trigger for any Services link across the page
+  document.addEventListener('click', (event) => {
+    if (window.innerWidth > 1023) return;
+    const servicesTrigger = event.target.closest('a[href="/services"], a[href="#services"], [data-open-mobile-services]');
+    if (servicesTrigger && !servicesTrigger.closest('#ojix-mobile-services-modal')) {
+      event.preventDefault();
+      closeNavigation();
+      openMobileServicesModal();
+    }
+  });
 
   // Parent disclosure links must stay open long enough for their submenu handler
   // to run. Only destination links close the mobile navigation.
@@ -1756,16 +1778,313 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.nav-item-has-mega')) {
-    megaContainers.forEach((container) => {
-      container.classList.remove('is-mega-open');
-      const topLink = container.querySelector('.nav-top-link');
-      if (topLink) topLink.setAttribute('aria-expanded', 'false');
-    });
-    if (eleksHeader) eleksHeader.classList.remove('has-mega-open');
+// ============================================================================
+// 13B. OJIX MOBILE-ONLY SERVICE CATEGORY CAROUSEL MODAL
+// ============================================================================
+function initMobileServicesCarousel() {
+  let modal = document.getElementById('ojix-mobile-services-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'ojix-mobile-services-modal';
+    modal.className = 'ojix-mobile-services-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Services Catalog');
+    modal.setAttribute('hidden', '');
+    modal.innerHTML = `
+      <div class="mobile-services-backdrop" data-close-mobile-services></div>
+      <div class="mobile-services-sheet">
+        <header class="mobile-services-header">
+          <a href="#top" class="mobile-services-brand" aria-label="OJIX home">
+            <img src="assets/ojix-navbar-logo.svg" alt="OJIX" width="96" height="46" />
+          </a>
+          <button type="button" class="mobile-services-close-btn" data-close-mobile-services aria-label="Close services panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </header>
+        <div class="mobile-services-nav-bar">
+          <div class="mobile-services-nav-top">
+            <span class="mobile-services-eyebrow">OUR SERVICES</span>
+            <span class="mobile-services-counter" aria-live="polite">
+              <span class="mobile-counter-current">01</span><span class="mobile-counter-sep">/</span><span class="mobile-counter-total">10</span>
+            </span>
+          </div>
+          <div class="mobile-services-tabs-scroll" role="tablist" aria-label="Service Categories" tabindex="0"></div>
+        </div>
+        <div class="mobile-services-carousel-wrap">
+          <div class="mobile-services-carousel" id="mobile-services-carousel" tabindex="0" role="region" aria-label="Service category carousel"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
-});
+
+  const tabsContainer = modal.querySelector('.mobile-services-tabs-scroll');
+  const carousel = modal.querySelector('#mobile-services-carousel');
+  const counterCurrent = modal.querySelector('.mobile-counter-current');
+  const counterTotal = modal.querySelector('.mobile-counter-total');
+  const closeBtn = modal.querySelector('.mobile-services-close-btn');
+  if (!tabsContainer || !carousel) return;
+
+  const totalCategories = SERVICES_CATALOG.length;
+  if (counterTotal) {
+    counterTotal.textContent = String(totalCategories).padStart(2, '0');
+  }
+
+  const CATEGORY_SHORT_NAMES = {
+    'software-development': 'Software',
+    'business-applications': 'Business',
+    'ai-and-data': 'AI & Data',
+    'integration-and-modernization': 'Integrations',
+    'cloud-and-infrastructure': 'Cloud',
+    'quality-and-security': 'Security',
+    'maintenance-and-support': 'Support',
+    'marketing-and-growth': 'Marketing',
+    'industry-solutions': 'Industry Solutions',
+    'commercial-models': 'Commercial Models'
+  };
+
+  // 1. Render Category Tabs (Horizontally scrollable selector)
+  tabsContainer.innerHTML = SERVICES_CATALOG.map((cat, idx) => {
+    const shortName = CATEGORY_SHORT_NAMES[cat.id] || cat.title;
+    return `
+      <button type="button"
+        class="mobile-cat-tab ${idx === 0 ? 'is-active' : ''}"
+        role="tab"
+        id="mobile-cat-tab-${cat.id}"
+        aria-controls="mobile-cat-panel-${cat.id}"
+        aria-selected="${idx === 0 ? 'true' : 'false'}"
+        title="${cat.title} (${cat.services.length} services)"
+        data-cat-index="${idx}">
+        <span class="mobile-cat-tab-icon" aria-hidden="true">${renderIcon(cat.icon)}</span>
+        <span class="mobile-cat-tab-text">${shortName}</span>
+      </button>
+    `;
+  }).join('');
+
+  // 2. Render Carousel Slides (One prominent category card per slide)
+  carousel.innerHTML = SERVICES_CATALOG.map((cat, idx) => {
+    const rowCount = Math.ceil(cat.services.length / 2);
+    return `
+      <article class="mobile-carousel-slide"
+        role="tabpanel"
+        id="mobile-cat-panel-${cat.id}"
+        aria-labelledby="mobile-cat-tab-${cat.id}"
+        data-cat-index="${idx}">
+        <div class="mobile-cat-card">
+          <!-- Category Header: Title & Description -->
+          <div class="mobile-cat-header">
+            <h3 class="mobile-cat-title">${cat.title}</h3>
+            <p class="mobile-cat-desc">${cat.description}</p>
+          </div>
+
+          <!-- Category Banner Image -->
+          ${cat.bannerImg ? `
+            <div class="mobile-cat-banner-wrap">
+              <img src="${cat.bannerImg}" alt="${cat.title} banner" class="mobile-cat-banner-img" loading="lazy" />
+            </div>
+          ` : ''}
+
+          <!-- Section Heading: Services -->
+          <div class="mobile-cat-section-header">
+            <span class="mobile-cat-section-title">Services</span>
+            <span class="mobile-cat-section-count">${cat.services.length}</span>
+          </div>
+
+          <!-- Compact Service List (Two-Column Grid) -->
+          <div class="mobile-cat-services-grid" style="grid-template-rows: repeat(${rowCount}, auto);">
+            ${cat.services.map((svc) => `
+              <a href="${svc.href}" class="mobile-cat-svc-item" aria-label="${svc.title}" title="${svc.title}">
+                <span class="mobile-cat-svc-icon" aria-hidden="true">${renderIcon(svc.icon)}</span>
+                <span class="mobile-cat-svc-name">${svc.title}</span>
+                <svg class="mobile-cat-svc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
+              </a>
+            `).join('')}
+          </div>
+
+          <!-- Compact Bottom Call-To-Action (CTA) -->
+          <div class="mobile-cat-cta">
+            <div class="mobile-cat-cta-header">
+              <div class="mobile-cat-cta-bulb" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                  <path d="M9 18h6"/><path d="M10 22h4"/>
+                </svg>
+              </div>
+              <div class="mobile-cat-cta-text">
+                <span class="mobile-cat-cta-eyebrow">LET'S BUILD SOMETHING GREAT</span>
+                <h4 class="mobile-cat-cta-title">Need a custom solution?</h4>
+              </div>
+            </div>
+            <a href="/contact" class="mobile-cat-cta-btn">
+              <span>Discuss a project</span>
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  let currentCategoryIndex = 0;
+  const tabButtons = tabsContainer.querySelectorAll('.mobile-cat-tab');
+
+  const updateActiveTab = (index) => {
+    if (index < 0 || index >= totalCategories) return;
+    currentCategoryIndex = index;
+
+    tabButtons.forEach((tab, i) => {
+      const active = i === index;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+      if (active) {
+        tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    });
+
+    if (counterCurrent) {
+      counterCurrent.textContent = String(index + 1).padStart(2, '0');
+    }
+  };
+
+  const goToSlide = (index, { smooth = true } = {}) => {
+    if (index < 0 || index >= totalCategories) return;
+    const slideWidth = carousel.clientWidth;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    carousel.scrollTo({
+      left: index * slideWidth,
+      behavior: (smooth && !reducedMotion) ? 'smooth' : 'auto'
+    });
+    updateActiveTab(index);
+  };
+
+  // Category tab clicks
+  tabsContainer.addEventListener('click', (e) => {
+    const tab = e.target.closest('.mobile-cat-tab');
+    if (!tab) return;
+    e.preventDefault();
+    const idx = parseInt(tab.getAttribute('data-cat-index'), 10);
+    goToSlide(idx);
+  });
+
+  // Carousel scroll sync with debouncing / rAF
+  let scrollRaf = null;
+  carousel.addEventListener('scroll', () => {
+    if (scrollRaf) cancelAnimationFrame(scrollRaf);
+    scrollRaf = requestAnimationFrame(() => {
+      const slideWidth = carousel.clientWidth;
+      if (!slideWidth) return;
+      const detected = Math.round(carousel.scrollLeft / slideWidth);
+      if (detected !== currentCategoryIndex && detected >= 0 && detected < totalCategories) {
+        updateActiveTab(detected);
+      }
+    });
+  }, { passive: true });
+
+  // Mouse Drag Support (allows desktop/touch-emulator dragging)
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragScrollLeft = 0;
+
+  carousel.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragStartX = e.pageX;
+    dragScrollLeft = carousel.scrollLeft;
+    carousel.style.scrollBehavior = 'auto';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const walk = e.pageX - dragStartX;
+    carousel.scrollLeft = dragScrollLeft - walk;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    carousel.style.scrollBehavior = 'smooth';
+    const slideWidth = carousel.clientWidth;
+    const target = Math.round(carousel.scrollLeft / slideWidth);
+    goToSlide(target);
+  });
+
+  // Keyboard navigation when inside carousel or modal
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') {
+      if (currentCategoryIndex < totalCategories - 1) {
+        e.preventDefault();
+        goToSlide(currentCategoryIndex + 1);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      if (currentCategoryIndex > 0) {
+        e.preventDefault();
+        goToSlide(currentCategoryIndex - 1);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeMobileServicesModal();
+    }
+  });
+
+  // Open and Close implementations
+  let lastFocusedElement = null;
+
+  openMobileServicesModal = (targetIndex = 0) => {
+    lastFocusedElement = document.activeElement;
+    modal.removeAttribute('hidden');
+    modal.classList.add('is-open');
+    document.body.classList.add('mobile-services-modal-open');
+    document.documentElement.classList.add('mobile-services-modal-open');
+
+    // Go to requested category index or default to 0
+    requestAnimationFrame(() => {
+      goToSlide(targetIndex, { smooth: false });
+      if (closeBtn) closeBtn.focus();
+    });
+  };
+
+  closeMobileServicesModal = () => {
+    if (!modal.classList.contains('is-open')) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('hidden', '');
+    document.body.classList.remove('mobile-services-modal-open');
+    document.documentElement.classList.remove('mobile-services-modal-open');
+
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      lastFocusedElement.focus();
+    }
+  };
+
+  // Close triggers
+  modal.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close-mobile-services]')) {
+      e.preventDefault();
+      closeMobileServicesModal();
+      return;
+    }
+    // Clicking any service link or CTA or brand closes the panel
+    const navLink = e.target.closest('a');
+    if (navLink) {
+      closeMobileServicesModal();
+    }
+  });
+
+  // Auto-close if screen resized above 1023px
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 1023 && modal.classList.contains('is-open')) {
+      closeMobileServicesModal();
+    }
+  }, { passive: true });
+}
+
+// Initialize Mobile Services Carousel
+initMobileServicesCarousel();
 
 // ============================================================================
 // 14. ELEKS-STYLE HERO HORIZONTAL EXPANDING ACCORDION SUBTABS

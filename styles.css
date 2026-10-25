@@ -11844,48 +11844,9 @@ a.eleks-mega-preview-media:hover .eleks-preview-img {
     display: none !important;
   }
 
-  /* Services Mega Menu Mobile & Tablet Overrides */
-  [data-mega="capabilities"] .eleks-mega-inner {
-    display: flex !important;
-    flex-direction: column !important;
-    max-height: none !important;
-  }
-
-  [data-mega="capabilities"] .eleks-mega-left {
-    border-right: none !important;
-    border-bottom: 1px solid #E5EAF0 !important;
-    max-height: 240px !important;
-    padding: 8px 0 !important;
-  }
-
-  [data-mega="capabilities"] .eleks-mega-right {
-    display: flex !important;
-    padding: 16px 14px !important;
-    max-height: none !important;
-    height: auto !important;
-    overflow-y: visible !important;
-  }
-
-  .services-scroll-body {
-    overflow-y: visible !important;
-  }
-
-  .services-overview-header {
-    margin-bottom: 12px !important;
-  }
-
-  .services-catalog-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .services-cta-banner {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-
-  .services-cta-button {
-    width: 100% !important;
-    justify-content: center !important;
+  /* Services Mega Menu Mobile & Tablet: Replaced by Mobile-Only Category Carousel Modal */
+  [data-mega="capabilities"] .eleks-mega-dropdown {
+    display: none !important;
   }
 
   .eleks-header-backdrop {

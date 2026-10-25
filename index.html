@@ -41,8 +41,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=5.1.5" />
-  <link rel="stylesheet" href="responsive.css?v=1.0.15" />
+  <link rel="stylesheet" href="styles.css?v=5.1.6" />
+  <link rel="stylesheet" href="responsive.css?v=1.0.16" />
   <style id="critical-platform-styles">
     /* Critical platform card layout: Clean light 2-column enterprise architecture */
     .stack-card-content {
@@ -3056,7 +3056,46 @@
     </div>
   </div>
 
-  <script src="app.js?v=5.1.4" defer></script>
+  <!-- MOBILE-ONLY SERVICE CATEGORY CAROUSEL MODAL (Full-screen browsing experience for mobile) -->
+  <div id="ojix-mobile-services-modal" class="ojix-mobile-services-modal" role="dialog" aria-modal="true" aria-label="Services Catalog" hidden>
+    <div class="mobile-services-backdrop" data-close-mobile-services></div>
+    <div class="mobile-services-sheet">
+      <!-- Sticky Mobile Header -->
+      <header class="mobile-services-header">
+        <a href="#top" class="mobile-services-brand" aria-label="OJIX home">
+          <img src="assets/ojix-navbar-logo.svg" alt="OJIX" width="96" height="46" />
+        </a>
+        <button type="button" class="mobile-services-close-btn" data-close-mobile-services aria-label="Close services panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </header>
+
+      <!-- Sticky Category Bar: Heading + Counter + Horizontal Category Tabs -->
+      <div class="mobile-services-nav-bar">
+        <div class="mobile-services-nav-top">
+          <span class="mobile-services-eyebrow">OUR SERVICES</span>
+          <span class="mobile-services-counter" aria-live="polite">
+            <span class="mobile-counter-current">01</span><span class="mobile-counter-sep">/</span><span class="mobile-counter-total">10</span>
+          </span>
+        </div>
+        <div class="mobile-services-tabs-scroll" role="tablist" aria-label="Service Categories" tabindex="0">
+          <!-- Populated dynamically by app.js from SERVICES_CATALOG -->
+        </div>
+      </div>
+
+      <!-- Main Carousel Area -->
+      <div class="mobile-services-carousel-wrap">
+        <div class="mobile-services-carousel" id="mobile-services-carousel" tabindex="0" role="region" aria-label="Service category carousel">
+          <!-- Slides populated dynamically by app.js from SERVICES_CATALOG -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=5.1.6" defer></script>
   <script type="module" src="assets/vendor/visual-effects.js?v=3.8.1"></script>
 </body>
 
